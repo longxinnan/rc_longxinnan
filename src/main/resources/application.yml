@@ -1,0 +1,56 @@
+spring:
+  application:
+    name: rc-longxinnan
+  datasource:
+    url: jdbc:mysql://localhost:3306/rc_longxinnan?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: ${MYSQL_PASSWORD:root}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+server:
+  port: 8080
+
+app:
+  poller:
+    fixed-delay-ms: 2000
+    batch-size: 50
+    pool-size: 1
+  providers:
+    # 订阅付款成功 -> CRM 变更 Contact 状态（低量、高实时 -> 同步投递，失败由轮询兜底）
+    crm:
+      url: https://crm.example.com/api/contact-status
+      method: POST
+      dispatch-mode: SYNC
+      max-attempts: 5
+      backoff-base-ms: 1000
+      connect-timeout: 2s
+      read-timeout: 5s
+      headers:
+        Content-Type: application/json
+        Authorization: "Bearer ${CRM_API_TOKEN:}"
+      body-template: |
+        { "customerId": {{payload.customerId}}, "status": {{payload.status}} }
+      alert:
+        enabled: true
+        consecutive-failures: 5
+        cooldown-minutes: 30
+        recipients:
+          - "ops@example.com"
+
+    # 广告引流成功注册 -> 通知广告系统（高量、低实时 -> 异步轮询投递）
+    adsystem:
+      url: https://ads.example.com/v1/leads
+      method: POST
+      dispatch-mode: ASYNC
+      max-attempts: 8
+      backoff-base-ms: 2000
+      connect-timeout: 2s
+      read-timeout: 5s
+      headers:
+        Content-Type: application/json
+        X-Api-Key: "${AD_SYSTEM_TOKEN:}"
+      body-template: |
+        { "event": {{payload.event}}, "data": {{payload.data}} }
