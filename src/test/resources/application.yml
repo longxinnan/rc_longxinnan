@@ -1,0 +1,53 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:notif;MODE=MySQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+
+app:
+  poller:
+    fixed-delay-ms: 3600000   # 集成测试手动调用 poller.run()，禁用定时触发
+    batch-size: 50
+    pool-size: 1
+  providers:
+    crm:
+      url: https://crm.example.com/api/contact-status
+      method: POST
+      dispatch-mode: SYNC
+      max-attempts: 5
+      backoff-base-ms: 60000
+      connect-timeout: 2s
+      read-timeout: 5s
+      headers:
+        Content-Type: application/json
+      body-template: |
+        { "customerId": {{payload.customerId}}, "status": {{payload.status}} }
+      alert:
+        enabled: true
+        consecutive-failures: 2
+        cooldown-minutes: 1000
+        recipients:
+          - "ops@test.local"
+    adsystem:
+      url: https://ads.example.com/v1/leads
+      method: POST
+      dispatch-mode: ASYNC
+      max-attempts: 2
+      backoff-base-ms: 60000
+      connect-timeout: 2s
+      read-timeout: 5s
+      headers:
+        Content-Type: application/json
+      body-template: |
+        { "event": {{payload.event}}, "data": {{payload.data}} }
+      alert:
+        enabled: true
+        consecutive-failures: 2
+        cooldown-minutes: 1000
+        recipients:
+          - "ops@test.local"
